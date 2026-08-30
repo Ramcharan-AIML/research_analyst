@@ -1,0 +1,73 @@
+# ---- Secrets / environment ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ---- Testing / coverage / type checking ----
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+
+# ---- Notebooks ----
+.ipynb_checkpoints/
+
+# ---- LangChain / LangGraph runtime artifacts ----
+.langgraph_api/
+.langgraph/
+*.sqlite
+*.sqlite3
+*.db
+.cache/
+.langchain.db
+
+# ---- Logs & local outputs ----
+*.log
+logs/
+outputs/
+reports/
+tmp/
+
+# ---- Editors / IDEs ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+desktop.ini
