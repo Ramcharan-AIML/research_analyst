@@ -40,6 +40,6 @@ def scrape_url(url :str) -> str:
     except Exception as e:
         return f"could not scrape URL: {str(e)}"
 
-print(scrape_url.invoke("https://indianexpress.com/article/entertainment/telugu/prabhas-at-45-between-the-mr-perfect-of-the-masses-and-darling-of-the-box-office-lies-a-rebel-of-a-few-words-9634018/"))
+# print(scrape_url.invoke("https://indianexpress.com/article/entertainment/telugu/prabhas-at-45-between-the-mr-perfect-of-the-masses-and-darling-of-the-box-office-lies-a-rebel-of-a-few-words-9634018/"))
 
 

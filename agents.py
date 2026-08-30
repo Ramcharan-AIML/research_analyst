@@ -15,7 +15,7 @@ load_dotenv()
 # LLM Model setup
 llm = ChatMistralAI(
     model = "mistral-medium-latest",
-    temparature = 0
+    temperature = 0.1
 )
 
 
