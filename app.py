@@ -53,7 +53,23 @@ html, body, [class*="css"], .stApp {
 
 .stApp { background: var(--paper); }
 [data-testid="stHeader"] { background: transparent; }
-#MainMenu, footer { visibility: hidden; }
+
+/* Hide the Streamlit chrome: hamburger menu, Deploy button, running indicator,
+   the coloured top strip, the footer, and the Community Cloud toolbar
+   (Share / star / fork / GitHub icons in the top-right). */
+#MainMenu,
+footer,
+header [data-testid="stToolbar"],
+[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+[data-testid="stActionButton"],
+[data-testid="stAppDeployButton"],
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+.viewerBadge_container__1QSob,
+.styles_viewerBadge__1yB5_,
+a[href*="streamlit.io/cloud"],
+a[href*="share.streamlit.io"] { display: none !important; }
 .block-container { padding-top: 2.4rem; padding-bottom: 4.5rem; max-width: 1080px; }
 
 .caps {
