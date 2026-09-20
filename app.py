@@ -345,6 +345,63 @@ def message_text(message) -> str:
     return as_text(getattr(message, "content", message))
 
 
+# ---- Rate-limit handling ----------------------------------------------------
+# Mistral's free tier allows roughly one request per second. A single pipeline
+# run fires six or more model calls back-to-back (each agent makes at least
+# two: one to choose a tool, one to answer), so an unpaced run trips a 429.
+# langchain-mistralai only retries network errors, not HTTP 429, so both the
+# pacing and the retry have to happen here.
+
+REQUESTS_PER_SECOND = 0.5     # one model call every 2 s - comfortably inside the limit
+RETRY_ATTEMPTS = 4            # total tries per stage before giving up
+RETRY_BASE_DELAY = 5          # seconds; doubles each attempt (5, 10, 20)
+
+
+def install_rate_limiter(agents_module) -> None:
+    """Attach a request pacer to the shared LLM if agents.py did not set one.
+
+    Every agent and chain in agents.py holds a reference to the same llm
+    object, so setting the attribute here paces all of them.
+    """
+    try:
+        from langchain_core.rate_limiters import InMemoryRateLimiter
+    except ImportError:
+        return
+    llm = getattr(agents_module, "llm", None)
+    if llm is not None and getattr(llm, "rate_limiter", None) is None:
+        llm.rate_limiter = InMemoryRateLimiter(
+            requests_per_second=REQUESTS_PER_SECOND,
+            check_every_n_seconds=0.1,
+            max_bucket_size=1,
+        )
+
+
+def is_rate_limited(exc: Exception) -> bool:
+    response = getattr(exc, "response", None)
+    if response is not None and getattr(response, "status_code", None) == 429:
+        return True
+    text = str(exc)
+    return "429" in text and ("rate" in text.lower() or "limit" in text.lower())
+
+
+def with_retry(fn, label: str, status):
+    """Run fn(); on HTTP 429 back off and retry, reporting progress via status."""
+    delay = RETRY_BASE_DELAY
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if not is_rate_limited(exc) or attempt == RETRY_ATTEMPTS:
+                raise
+            status.update(
+                label=f"{label} - rate limited by the model API, "
+                      f"retrying in {delay}s (attempt {attempt} of {RETRY_ATTEMPTS - 1})",
+                state="running",
+            )
+            time.sleep(delay)
+            delay = min(delay * 2, 40)
+
+
 def render_stages(active: int = -1, done: int = -1):
     """active = index currently running, done = index of last completed stage."""
     html = ['<div class="stages">']
@@ -590,6 +647,7 @@ if run:
             }
         else:
             try:
+                import agents as agents_module
                 from agents import (
                     build_search_agent,
                     build_reader_agent,
@@ -600,6 +658,8 @@ if run:
                 st.error(f"Could not import agents.py: {type(e).__name__} - {e}")
                 st.stop()
 
+            install_rate_limiter(agents_module)
+
             state = {}
             try:
                 # Stage 1 - search
@@ -607,9 +667,12 @@ if run:
                     render_stages(active=0)
                 with st.status("Search agent querying the web...", expanded=False) as s:
                     agent = build_search_agent()
-                    out = agent.invoke({"messages": [
-                        ("user", f"Find recent, reliable and detailed information about: {topic}")
-                    ]})
+                    out = with_retry(
+                        lambda: agent.invoke({"messages": [
+                            ("user", f"Find recent, reliable and detailed information about: {topic}")
+                        ]}),
+                        "Search agent", s,
+                    )
                     state["search_results"] = message_text(out["messages"][-1])
                     s.update(label="Search agent complete", state="complete")
 
@@ -618,12 +681,15 @@ if run:
                     render_stages(active=1, done=0)
                 with st.status("Reader agent scraping top source...", expanded=False) as s:
                     agent = build_reader_agent()
-                    out = agent.invoke({"messages": [(
-                        "user",
-                        f"Based on the following search results about '{topic}', "
-                        f"pick the most relevant URL and scrape it for deeper content.\n\n"
-                        f"Search results:\n {state['search_results'][:800]}"
-                    )]})
+                    out = with_retry(
+                        lambda: agent.invoke({"messages": [(
+                            "user",
+                            f"Based on the following search results about '{topic}', "
+                            f"pick the most relevant URL and scrape it for deeper content.\n\n"
+                            f"Search results:\n {state['search_results'][:800]}"
+                        )]}),
+                        "Reader agent", s,
+                    )
                     state["scraped_content"] = message_text(out["messages"][-1])
                     s.update(label="Reader agent complete", state="complete")
 
@@ -635,8 +701,9 @@ if run:
                         f"SEARCH RESULTS : \n {state['search_results']} \n\n"
                         f"DETAILED SCRAPED CONTENT : \n {state['scraped_content']}"
                     )
-                    state["report"] = as_text(writer_chain.invoke(
-                        {"topic": topic, "research": combined}
+                    state["report"] = as_text(with_retry(
+                        lambda: writer_chain.invoke({"topic": topic, "research": combined}),
+                        "Writer chain", s,
                     ))
                     s.update(label="Writer chain complete", state="complete")
 
@@ -644,9 +711,10 @@ if run:
                 with stage_slot.container():
                     render_stages(active=3, done=2)
                 with st.status("Critic chain reviewing...", expanded=False) as s:
-                    state["feedback"] = as_text(
-                        critic_chain.invoke({"report": state["report"]})
-                    )
+                    state["feedback"] = as_text(with_retry(
+                        lambda: critic_chain.invoke({"report": state["report"]}),
+                        "Critic chain", s,
+                    ))
                     s.update(label="Critic chain complete", state="complete")
 
                 with stage_slot.container():
@@ -658,7 +726,15 @@ if run:
                 st.session_state.result = state
 
             except Exception as e:
-                st.error(f"Pipeline failed: {type(e).__name__} - {e}")
+                if is_rate_limited(e):
+                    st.error(
+                        "The model API is still rate-limiting after several retries. "
+                        "Wait a minute and run again. If this keeps happening, the API key's "
+                        "plan is the constraint - the free tier allows roughly one request "
+                        "per second, and each analysis makes six or more."
+                    )
+                else:
+                    st.error(f"Pipeline failed: {type(e).__name__} - {e}")
                 st.session_state.result = None
 
         if st.session_state.result:
