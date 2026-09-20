@@ -99,10 +99,6 @@ a[href*="share.streamlit.io"] { display: none !important; }
              font-variant-numeric:tabular-nums; min-width:13px; }
 .side-name { font-size:.84rem; color:var(--body); font-weight:500; }
 .side-role { font-size:.765rem; color:var(--muted); margin-top:.05rem; }
-.side-kv   { display:flex; justify-content:space-between; gap:1rem; padding:.32rem 0;
-             font-size:.79rem; border-bottom:1px solid var(--rule-soft); }
-.side-kv b { font-weight:500; color:var(--body); }
-.side-kv span { color:var(--muted); }
 
 /* ---------- Masthead ---------- */
 .masthead { margin-bottom:2.1rem; }
@@ -276,8 +272,6 @@ div[data-testid="stExpander"] details {
 .sec-label { font-size:.665rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase;
              color:var(--faint); margin:1.6rem 0 .65rem; }
 .hint { font-size:.735rem; color:var(--faint); margin:0 0 .55rem; letter-spacing:.01em; }
-.foot { border-top:1px solid var(--rule); margin-top:3.4rem; padding-top:1.3rem;
-        color:var(--faint); font-size:.765rem; display:flex; justify-content:space-between; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -513,15 +507,6 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div class="side-label">Configuration</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="side-kv"><b>Model</b><span>mistral-medium-latest</span></div>'
-        '<div class="side-kv"><b>Runtime</b><span>LangChain &middot; LangGraph</span></div>'
-        '<div class="side-kv"><b>Search</b><span>Tavily</span></div>'
-        '<div class="side-kv" style="border-bottom:none;"><b>Scraper</b><span>BeautifulSoup</span></div>',
-        unsafe_allow_html=True,
-    )
-
     if st.session_state.history:
         st.markdown('<div class="side-label">Recent runs</div>', unsafe_allow_html=True)
         for h in reversed(st.session_state.history[-6:]):
@@ -723,7 +708,6 @@ if res:
             f'<div class="caps">Research report</div>'
             f'<h2>{res.get("topic", "")}</h2>'
             f'<div class="meta"><span class="num">{stamp.strftime("%d %B %Y, %H:%M")}</span>'
-            f'<i>&middot;</i><span>mistral-medium-latest</span>'
             f'<i>&middot;</i><span class="num">{len(sources)} sources</span>'
             f'<i>&middot;</i><span class="num">{words:,} words</span></div></div>'
             f'<div class="doc">',
@@ -798,9 +782,3 @@ else:
         'then run the analysis.</div></div>',
         unsafe_allow_html=True,
     )
-
-st.markdown(
-    '<div class="foot"><span>Research Analyst</span>'
-    '<span>LangChain &middot; LangGraph &middot; Mistral &middot; Tavily</span></div>',
-    unsafe_allow_html=True,
-)
